@@ -1,0 +1,164 @@
+import json
+import pandas as pd
+import streamlit as st
+import plotly.express as px
+from data_tools import (
+    REQUIRED_COLUMNS,
+    read_uploaded_file,
+    find_missing_columns,
+    guess_column,
+    clean_data,
+    build_summary,
+)
+from ai_analyst import get_insights, find_unverified_numbers
+from report import build_report_html
+
+st.set_page_config(page_title="Sales Insights", page_icon="📊", layout="wide")
+
+st.title("Sales Insights Dashboard")
+st.caption("A clear view of how your business is performing.")
+
+with st.sidebar:
+    st.header("Your data")
+    uploaded = st.file_uploader("Upload a sales file", type=["csv", "xlsx"])
+    st.caption("Your file needs these columns: date, product, quantity, unit_price, customer_region.")
+
+if uploaded is None:
+    raw = pd.read_csv("data/sales_data.csv")
+    st.info("You are viewing sample data. Upload your own file in the sidebar to analyse your business.")
+else:
+    try:
+        raw = read_uploaded_file(uploaded)
+    except Exception:
+        st.error("We could not read this file. Please upload a valid CSV or Excel (.xlsx) file.")
+        st.stop()
+
+raw.columns = [str(c).strip() for c in raw.columns]
+
+missing = find_missing_columns(raw)
+if missing:
+    st.warning("Your column names are different from ours. Please check that each one below is matched correctly.")
+
+    options = ["Choose a column"] + [c for c in raw.columns if c not in REQUIRED_COLUMNS]
+    choices = {}
+    for needed in missing:
+        guess = guess_column(needed, raw.columns)
+        index = options.index(guess) if guess in options else 0
+        choices[needed] = st.selectbox(
+            f"Which column is '{needed}'?", options, index=index, key=f"map_{needed}"
+        )
+
+    picked = list(choices.values())
+    if "Choose a column" in picked:
+        st.info("Please choose a column for each item above to continue.")
+        st.stop()
+    if len(set(picked)) < len(picked):
+        st.error("The same column was chosen twice. Please choose a different column for each item.")
+        st.stop()
+
+    raw = raw.rename(columns={choice: needed for needed, choice in choices.items()})
+
+df = clean_data(raw)
+
+if df.empty:
+    st.error("No usable rows were found in this file.")
+    st.stop()
+
+removed = len(raw) - len(df)
+if removed > 0:
+    st.warning(f"{removed} row(s) were left out because they had missing or invalid values.")
+
+summary = build_summary(df)
+
+data_key = json.dumps(summary, sort_keys=True)
+if st.session_state.get("data_key") != data_key:
+    st.session_state["data_key"] = data_key
+    st.session_state.pop("insights", None)
+    st.session_state.pop("problems", None)
+
+card1, card2, card3, card4 = st.columns(4)
+card1.metric("Total sales", f"₦{summary['total_sales_naira']:,}")
+card2.metric("Orders", summary["number_of_sales"])
+card3.metric("Top product", summary["best_product"])
+card4.metric("Top city", summary["best_region"])
+
+by_product = df.groupby("product")["revenue"].sum().reset_index()
+by_product = by_product.sort_values("revenue", ascending=False)
+
+by_region = df.groupby("customer_region")["revenue"].sum().reset_index()
+by_region = by_region.sort_values("revenue", ascending=False)
+
+by_day = df.groupby("date")["revenue"].sum().reset_index()
+
+tab_overview, tab_trends, tab_ai, tab_data = st.tabs(
+    ["Overview", "Trends", "AI Insights", "Data"]
+)
+
+with tab_overview:
+    left, right = st.columns(2)
+    with left:
+        fig_product = px.bar(
+            by_product, x="product", y="revenue", title="Sales by product",
+            labels={"product": "Product", "revenue": "Revenue (₦)"},
+        )
+        st.plotly_chart(fig_product)
+    with right:
+        fig_region = px.bar(
+            by_region, x="customer_region", y="revenue", title="Sales by city",
+            labels={"customer_region": "City", "revenue": "Revenue (₦)"},
+        )
+        st.plotly_chart(fig_region)
+
+with tab_trends:
+    fig_day = px.line(
+        by_day, x="date", y="revenue", markers=True, title="Sales day by day",
+        labels={"date": "Date", "revenue": "Revenue (₦)"},
+    )
+    st.plotly_chart(fig_day)
+    st.caption("Short periods show a snapshot, not a long-term trend.")
+
+with tab_ai:
+    st.subheader("AI insights")
+    st.write("Press the button to get a short written summary of your numbers.")
+    st.caption("Only a summary of totals is sent to the AI, never your full file.")
+
+    if st.button("Generate insights"):
+        with st.spinner("Reading your numbers..."):
+            text = get_insights(summary)
+            st.session_state["insights"] = text
+            st.session_state["problems"] = find_unverified_numbers(text, summary)
+
+    if "insights" in st.session_state:
+        text = st.session_state["insights"]
+        if text.startswith(("The AI could not", "No API key")):
+            st.error(text)
+        else:
+            st.markdown(text)
+            if st.session_state["problems"]:
+                st.warning(
+                    "Some figures could not be matched to your data: "
+                    + ", ".join(st.session_state["problems"])
+                )
+            else:
+                st.success("Every figure in this summary was checked against your data.")
+            st.caption("Insights are written by AI from your data. Please review them before making business decisions.")
+
+with tab_data:
+    table = df.copy()
+    table["date"] = table["date"].dt.date
+    st.dataframe(table, hide_index=True)
+
+report_insights = st.session_state.get("insights")
+if report_insights and report_insights.startswith(("The AI could not", "No API key")):
+    report_insights = None
+
+with st.sidebar:
+    st.divider()
+    st.header("Report")
+    st.caption("Download a summary you can keep, print or share.")
+    st.download_button(
+        "Download report",
+        data=build_report_html(summary, report_insights, st.session_state.get("problems")),
+        file_name="sales_report.html",
+        mime="text/html",
+    )
