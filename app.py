@@ -87,7 +87,11 @@ def style_chart(fig):
 
 with st.sidebar:
     st.header("Your data")
-    uploaded = st.file_uploader("Upload a sales file", type=["csv", "xlsx"])
+    uploaded = st.file_uploader(
+        "Upload a sales file",
+        type=["csv", "xlsx"],
+        key=f"uploader_{st.session_state.get('uploader_version', 0)}",
+    )
     st.caption("Your file needs these columns: date, product, quantity, unit_price, customer_region.")
 
     st.divider()

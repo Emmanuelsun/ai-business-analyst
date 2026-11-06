@@ -63,8 +63,11 @@ def sign_out():
             client.auth.sign_out()
         except Exception:
             pass
-    st.session_state.pop("sb_client", None)
-    st.session_state.pop("user_email", None)
+
+    for name in ["sb_client", "user_email", "insights", "problems", "data_key", "flash"]:
+        st.session_state.pop(name, None)
+
+    st.session_state["uploader_version"] = st.session_state.get("uploader_version", 0) + 1
 
 
 def save_report(title, html_text):
