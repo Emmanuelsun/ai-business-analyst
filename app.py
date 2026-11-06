@@ -15,8 +15,66 @@ from report import build_report_html
 
 st.set_page_config(page_title="Sales Insights", page_icon="📊", layout="wide")
 
-st.title("Sales Insights Dashboard")
-st.caption("A clear view of how your business is performing.")
+TEAL = "#00C2A8"
+
+st.markdown(
+    """
+    <style>
+    .block-container { padding-top: 5rem; padding-bottom: 3rem; max-width: 1200px; }
+    .hero {
+        background: linear-gradient(135deg, #00C2A8 0%, #1B6EF3 100%);
+        border-radius: 16px;
+        padding: 24px 28px;
+        margin-bottom: 24px;
+    }
+    .hero-title { font-size: 2rem; font-weight: 700; color: #FFFFFF; line-height: 1.2; }
+    .hero-sub { margin-top: 6px; color: #E6FFFB; }
+    .mobile-hint { display: none; color: #9FB3D1; font-size: 0.9rem; margin-bottom: 12px; }
+    div[data-testid="stMetric"] {
+        background: #141C2F;
+        border: 1px solid #22304D;
+        border-left: 4px solid #00C2A8;
+        border-radius: 12px;
+        padding: 14px 16px;
+    }
+    div[data-testid="stMetricValue"] { font-size: 1.6rem; }
+    div[data-testid="stMetricValue"] > div {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+    }
+    footer { visibility: hidden; }
+
+    @media (max-width: 640px) {
+        .block-container { padding-left: 1rem; padding-right: 1rem; padding-top: 4.5rem; }
+        .hero { padding: 16px 18px; border-radius: 12px; }
+        .hero-title { font-size: 1.4rem; }
+        .mobile-hint { display: block; }
+        div[data-testid="stMetric"] { padding: 10px 12px; }
+    }
+    </style>
+    <div class="hero">
+        <div class="hero-title">Sales Insights Dashboard</div>
+        <div class="hero-sub">A clear view of how your business is performing.</div>
+    </div>
+    <div class="mobile-hint">On a phone, tap the small arrow at the top left to open the menu. You can upload a file and download your report there.</div>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+def style_chart(fig):
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font_color="#E8EEF8",
+        margin=dict(l=10, r=10, t=50, b=10),
+    )
+    fig.update_xaxes(showgrid=False, automargin=True)
+    fig.update_yaxes(gridcolor="#22304D", automargin=True)
+    return fig
+
 
 with st.sidebar:
     st.header("Your data")
@@ -100,21 +158,24 @@ with tab_overview:
         fig_product = px.bar(
             by_product, x="product", y="revenue", title="Sales by product",
             labels={"product": "Product", "revenue": "Revenue (₦)"},
+            color_discrete_sequence=[TEAL], text_auto=".3s",
         )
-        st.plotly_chart(fig_product)
+        st.plotly_chart(style_chart(fig_product), theme=None)
     with right:
         fig_region = px.bar(
             by_region, x="customer_region", y="revenue", title="Sales by city",
             labels={"customer_region": "City", "revenue": "Revenue (₦)"},
+            color_discrete_sequence=[TEAL], text_auto=".3s",
         )
-        st.plotly_chart(fig_region)
+        st.plotly_chart(style_chart(fig_region), theme=None)
 
 with tab_trends:
     fig_day = px.line(
         by_day, x="date", y="revenue", markers=True, title="Sales day by day",
         labels={"date": "Date", "revenue": "Revenue (₦)"},
+        color_discrete_sequence=[TEAL],
     )
-    st.plotly_chart(fig_day)
+    st.plotly_chart(style_chart(fig_day), theme=None)
     st.caption("Short periods show a snapshot, not a long-term trend.")
 
 with tab_ai:
