@@ -12,6 +12,15 @@ from data_tools import (
 )
 from ai_analyst import get_insights, find_unverified_numbers
 from report import build_report_html
+from auth_tools import (
+    current_user_email,
+    sign_in,
+    sign_up,
+    sign_out,
+    save_report,
+    list_reports,
+    delete_report,
+)
 
 st.set_page_config(page_title="Sales Insights", page_icon="📊", layout="wide")
 
@@ -57,7 +66,7 @@ st.markdown(
         <div class="hero-title">Sales Insights Dashboard</div>
         <div class="hero-sub">A clear view of how your business is performing.</div>
     </div>
-    <div class="mobile-hint">On a phone, tap the small arrow at the top left to open the menu. You can upload a file and download your report there.</div>
+    <div class="mobile-hint">On a phone, tap the small arrow at the top left to open the menu. You can upload a file, log in and download your report there.</div>
     """,
     unsafe_allow_html=True,
 )
@@ -80,6 +89,41 @@ with st.sidebar:
     st.header("Your data")
     uploaded = st.file_uploader("Upload a sales file", type=["csv", "xlsx"])
     st.caption("Your file needs these columns: date, product, quantity, unit_price, customer_region.")
+
+    st.divider()
+    st.header("Account")
+    user_email = current_user_email()
+    if user_email:
+        st.write(f"Signed in as **{user_email}**")
+        if st.button("Log out"):
+            sign_out()
+            st.rerun()
+    else:
+        st.caption("Log in to save reports and see your history.")
+        login_tab, signup_tab = st.tabs(["Log in", "Sign up"])
+        with login_tab:
+            login_email = st.text_input("Email", key="login_email")
+            login_password = st.text_input("Password", type="password", key="login_password")
+            if st.button("Log in", key="login_button"):
+                ok, message = sign_in(login_email.strip(), login_password)
+                if ok:
+                    st.rerun()
+                else:
+                    st.error(message)
+        with signup_tab:
+            signup_email = st.text_input("Email", key="signup_email")
+            signup_password = st.text_input(
+                "Password (at least 6 characters)", type="password", key="signup_password"
+            )
+            if st.button("Create account", key="signup_button"):
+                ok, message = sign_up(signup_email.strip(), signup_password)
+                if ok and current_user_email():
+                    st.rerun()
+                elif ok:
+                    st.success(message)
+                else:
+                    st.error(message)
+        st.caption("Saved reports are linked to your account and are not shown to other users.")
 
 if uploaded is None:
     raw = pd.read_csv("data/sales_data.csv")
@@ -148,8 +192,8 @@ by_region = by_region.sort_values("revenue", ascending=False)
 
 by_day = df.groupby("date")["revenue"].sum().reset_index()
 
-tab_overview, tab_trends, tab_ai, tab_data = st.tabs(
-    ["Overview", "Trends", "AI Insights", "Data"]
+tab_overview, tab_trends, tab_ai, tab_data, tab_history = st.tabs(
+    ["Overview", "Trends", "AI Insights", "Data", "History"]
 )
 
 with tab_overview:
@@ -209,17 +253,59 @@ with tab_data:
     table["date"] = table["date"].dt.date
     st.dataframe(table, hide_index=True)
 
+with tab_history:
+    st.subheader("Your saved reports")
+    if not current_user_email():
+        st.info("Log in from the sidebar to see and keep your past reports.")
+    else:
+        saved = list_reports()
+        if not saved:
+            st.write("You have no saved reports yet. Use 'Save report to my history' in the sidebar.")
+        for item in saved:
+            when = item["created_at"][:16].replace("T", " ")
+            col_a, col_b, col_c = st.columns([5, 2, 1])
+            col_a.write(f"**{item['title']}**  \n{when} UTC")
+            col_b.download_button(
+                "Download",
+                data=item["html"],
+                file_name=f"report_{item['id']}.html",
+                mime="text/html",
+                key=f"dl_{item['id']}",
+            )
+            if col_c.button("Delete", key=f"del_{item['id']}"):
+                delete_report(item["id"])
+                st.rerun()
+
 report_insights = st.session_state.get("insights")
 if report_insights and report_insights.startswith(("The AI could not", "No API key")):
     report_insights = None
+
+report_html = build_report_html(summary, report_insights, st.session_state.get("problems"))
 
 with st.sidebar:
     st.divider()
     st.header("Report")
     st.caption("Download a summary you can keep, print or share.")
+
+    flash = st.session_state.pop("flash", None)
+    if flash:
+        st.success(flash)
+
     st.download_button(
         "Download report",
-        data=build_report_html(summary, report_insights, st.session_state.get("problems")),
+        data=report_html,
         file_name="sales_report.html",
         mime="text/html",
     )
+
+    if current_user_email():
+        if st.button("Save report to my history"):
+            title = f"Sales report {summary['first_date']} to {summary['last_date']}"
+            ok, message = save_report(title, report_html)
+            if ok:
+                st.session_state["flash"] = message
+                st.rerun()
+            else:
+                st.error(message)
+    else:
+        st.caption("Log in to save reports to your history.")
