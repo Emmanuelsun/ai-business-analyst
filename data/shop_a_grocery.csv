@@ -1,0 +1,15 @@
+date,product,quantity,unit_price,customer_region
+2026-04-01,Garri 50kg,6,38000,Kano
+2026-04-01,Palm Oil 5L,10,12500,Enugu
+2026-04-02,Indomie Carton,20,9800,Kano
+2026-04-03,Sugar 10kg,8,21000,Kaduna
+2026-04-04,Milo Tin,15,6500,Lagos
+2026-04-05,Peak Milk Carton,5,24000,Kano
+2026-04-06,Garri 50kg,4,38000,Enugu
+2026-04-07,Indomie Carton,12,9800,Kano
+2026-04-08,Toothpaste Pack,25,4200,Lagos
+2026-04-09,Palm Oil 5L,7,12500,Kaduna
+2026-04-10,Sugar 10kg,6,21000,Lagos
+2026-04-11,Milo Tin,9,6500,Enugu
+2026-04-12,Peak Milk Carton,3,24000,Lagos
+2026-04-13,Garri 50kg,5,38000,Kano

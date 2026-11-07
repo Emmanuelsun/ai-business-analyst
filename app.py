@@ -25,6 +25,21 @@ from auth_tools import (
 st.set_page_config(page_title="Sales Insights", page_icon="📊", layout="wide")
 
 TEAL = "#00C2A8"
+GITHUB_URL = "https://github.com/Emmanuelsun/ai-business-analyst"
+
+EXAMPLE_INSIGHTS = """**Overview**
+Between January 5, 2026, and January 15, 2026, you recorded 11 sales totaling 950,500 Nigerian Naira. Please note this data covers only a few days and a small number of sales, so it is too small to be sure about long-term trends.
+
+**Key Insights**
+* Rice 50kg was your best product, making up 45.7% of your total sales with 434,000 Nigerian Naira.
+* Printer Paper was your weakest product, bringing in 44,000 Nigerian Naira.
+* Lagos was your best region with 395,000 Nigerian Naira in sales.
+
+**Practical Recommendations**
+* Keep enough Rice 50kg in stock since it is your top seller.
+* Look closely at why Printer Paper brought in the lowest amount to decide if you should restock it.
+* Focus some extra attention on customers in Lagos, as they brought in the highest regional sales.
+"""
 
 st.markdown(
     """
@@ -72,6 +87,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+st.caption("Portfolio demo: please use sample or test data only, and a throwaway email if you sign up.")
+
 
 def style_chart(fig):
     fig.update_layout(
@@ -97,6 +114,7 @@ with top_left:
             key=f"uploader_{st.session_state.get('uploader_version', 0)}",
         )
         st.caption("Your file needs these columns: date, product, quantity, unit_price, customer_region.")
+        st.caption("Test data only, please. This is a demo.")
 
 with top_right:
     with st.container(border=True):
@@ -132,6 +150,7 @@ with top_right:
                         st.success(message)
                     else:
                         st.error(message)
+                st.caption("This is a portfolio demo. Please use a throwaway email and a password you do not use anywhere else.")
             st.caption("Saved reports are linked to your account and are not shown to other users.")
 
 if uploaded is None:
@@ -234,7 +253,12 @@ with tab_trends:
 with tab_ai:
     st.subheader("AI insights")
     if not current_user_email():
-        st.info("Log in from the Account box at the top to generate AI insights.")
+        if uploaded is None:
+            st.info("Log in to generate fresh AI insights. Here is an example that was generated earlier from the sample data.")
+            st.markdown(EXAMPLE_INSIGHTS)
+            st.caption("Example only. Every figure in it was checked against the sample data. Log in to generate your own.")
+        else:
+            st.info("Log in from the Account box at the top to generate AI insights for your file.")
     else:
         st.write("Press the button to get a short written summary of your numbers.")
         st.caption("Only a summary of totals is sent to the AI, never your full file.")
@@ -322,3 +346,9 @@ with st.container(border=True):
                     st.error(message)
         else:
             st.caption("Log in to save reports to your history.")
+
+st.divider()
+st.caption(
+    f"Portfolio project built with Python, Pandas, Plotly, Streamlit, Gemini and Supabase. "
+    f"[Source code on GitHub]({GITHUB_URL})"
+)
