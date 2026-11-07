@@ -7,8 +7,19 @@ from google import genai
 load_dotenv()
 
 
+def _get_setting(name):
+    value = os.getenv(name)
+    if value:
+        return value
+    try:
+        import streamlit as st
+        return st.secrets[name]
+    except Exception:
+        return None
+
+
 def get_insights(summary):
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = _get_setting("GEMINI_API_KEY")
     if not api_key:
         return "No API key found. Check your .env file."
 
