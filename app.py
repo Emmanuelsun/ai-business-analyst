@@ -38,7 +38,6 @@ st.markdown(
     }
     .hero-title { font-size: 2rem; font-weight: 700; color: #FFFFFF; line-height: 1.2; }
     .hero-sub { margin-top: 6px; color: #E6FFFB; }
-    .mobile-hint { display: none; color: #9FB3D1; font-size: 0.9rem; margin-bottom: 12px; }
     div[data-testid="stMetric"] {
         background: #141C2F;
         border: 1px solid #22304D;
@@ -58,15 +57,17 @@ st.markdown(
         .block-container { padding-left: 1rem; padding-right: 1rem; padding-top: 4.5rem; }
         .hero { padding: 16px 18px; border-radius: 12px; }
         .hero-title { font-size: 1.4rem; }
-        .mobile-hint { display: block; }
         div[data-testid="stMetric"] { padding: 10px 12px; }
+        div.stButton > button, div.stDownloadButton > button {
+            width: 100%;
+            min-height: 44px;
+        }
     }
     </style>
     <div class="hero">
         <div class="hero-title">Sales Insights Dashboard</div>
         <div class="hero-sub">A clear view of how your business is performing.</div>
     </div>
-    <div class="mobile-hint">On a phone, tap the small arrow at the top left to open the menu. You can upload a file, log in and download your report there.</div>
     """,
     unsafe_allow_html=True,
 )
@@ -85,53 +86,57 @@ def style_chart(fig):
     return fig
 
 
-with st.sidebar:
-    st.header("Your data")
-    uploaded = st.file_uploader(
-        "Upload a sales file",
-        type=["csv", "xlsx"],
-        key=f"uploader_{st.session_state.get('uploader_version', 0)}",
-    )
-    st.caption("Your file needs these columns: date, product, quantity, unit_price, customer_region.")
+top_left, top_right = st.columns(2)
 
-    st.divider()
-    st.header("Account")
-    user_email = current_user_email()
-    if user_email:
-        st.write(f"Signed in as **{user_email}**")
-        if st.button("Log out"):
-            sign_out()
-            st.rerun()
-    else:
-        st.caption("Log in to save reports and see your history.")
-        login_tab, signup_tab = st.tabs(["Log in", "Sign up"])
-        with login_tab:
-            login_email = st.text_input("Email", key="login_email")
-            login_password = st.text_input("Password", type="password", key="login_password")
-            if st.button("Log in", key="login_button"):
-                ok, message = sign_in(login_email.strip(), login_password)
-                if ok:
-                    st.rerun()
-                else:
-                    st.error(message)
-        with signup_tab:
-            signup_email = st.text_input("Email", key="signup_email")
-            signup_password = st.text_input(
-                "Password (at least 6 characters)", type="password", key="signup_password"
-            )
-            if st.button("Create account", key="signup_button"):
-                ok, message = sign_up(signup_email.strip(), signup_password)
-                if ok and current_user_email():
-                    st.rerun()
-                elif ok:
-                    st.success(message)
-                else:
-                    st.error(message)
-        st.caption("Saved reports are linked to your account and are not shown to other users.")
+with top_left:
+    with st.container(border=True):
+        st.subheader("Your data")
+        uploaded = st.file_uploader(
+            "Upload a sales file",
+            type=["csv", "xlsx"],
+            key=f"uploader_{st.session_state.get('uploader_version', 0)}",
+        )
+        st.caption("Your file needs these columns: date, product, quantity, unit_price, customer_region.")
+
+with top_right:
+    with st.container(border=True):
+        st.subheader("Account")
+        user_email = current_user_email()
+        if user_email:
+            st.write(f"Signed in as **{user_email}**")
+            if st.button("Log out"):
+                sign_out()
+                st.rerun()
+        else:
+            st.caption("Log in to save reports, see your history and generate AI insights.")
+            login_tab, signup_tab = st.tabs(["Log in", "Sign up"])
+            with login_tab:
+                login_email = st.text_input("Email", key="login_email")
+                login_password = st.text_input("Password", type="password", key="login_password")
+                if st.button("Log in", key="login_button"):
+                    ok, message = sign_in(login_email.strip(), login_password)
+                    if ok:
+                        st.rerun()
+                    else:
+                        st.error(message)
+            with signup_tab:
+                signup_email = st.text_input("Email", key="signup_email")
+                signup_password = st.text_input(
+                    "Password (at least 6 characters)", type="password", key="signup_password"
+                )
+                if st.button("Create account", key="signup_button"):
+                    ok, message = sign_up(signup_email.strip(), signup_password)
+                    if ok and current_user_email():
+                        st.rerun()
+                    elif ok:
+                        st.success(message)
+                    else:
+                        st.error(message)
+            st.caption("Saved reports are linked to your account and are not shown to other users.")
 
 if uploaded is None:
     raw = pd.read_csv("data/sales_data.csv")
-    st.info("You are viewing sample data. Upload your own file in the sidebar to analyse your business.")
+    st.info("You are viewing sample data. Upload your own file in the box above to analyse your business.")
 else:
     try:
         raw = read_uploaded_file(uploaded)
@@ -228,29 +233,32 @@ with tab_trends:
 
 with tab_ai:
     st.subheader("AI insights")
-    st.write("Press the button to get a short written summary of your numbers.")
-    st.caption("Only a summary of totals is sent to the AI, never your full file.")
+    if not current_user_email():
+        st.info("Log in from the Account box at the top to generate AI insights.")
+    else:
+        st.write("Press the button to get a short written summary of your numbers.")
+        st.caption("Only a summary of totals is sent to the AI, never your full file.")
 
-    if st.button("Generate insights"):
-        with st.spinner("Reading your numbers..."):
-            text = get_insights(summary)
-            st.session_state["insights"] = text
-            st.session_state["problems"] = find_unverified_numbers(text, summary)
+        if st.button("Generate insights"):
+            with st.spinner("Reading your numbers..."):
+                text = get_insights(summary)
+                st.session_state["insights"] = text
+                st.session_state["problems"] = find_unverified_numbers(text, summary)
 
-    if "insights" in st.session_state:
-        text = st.session_state["insights"]
-        if text.startswith(("The AI could not", "No API key")):
-            st.error(text)
-        else:
-            st.markdown(text)
-            if st.session_state["problems"]:
-                st.warning(
-                    "Some figures could not be matched to your data: "
-                    + ", ".join(st.session_state["problems"])
-                )
+        if "insights" in st.session_state:
+            text = st.session_state["insights"]
+            if text.startswith(("The AI could not", "No API key")):
+                st.error(text)
             else:
-                st.success("Every figure in this summary was checked against your data.")
-            st.caption("Insights are written by AI from your data. Please review them before making business decisions.")
+                st.markdown(text)
+                if st.session_state["problems"]:
+                    st.warning(
+                        "Some figures could not be matched to your data: "
+                        + ", ".join(st.session_state["problems"])
+                    )
+                else:
+                    st.success("Every figure in this summary was checked against your data.")
+                st.caption("Insights are written by AI from your data. Please review them before making business decisions.")
 
 with tab_data:
     table = df.copy()
@@ -260,11 +268,11 @@ with tab_data:
 with tab_history:
     st.subheader("Your saved reports")
     if not current_user_email():
-        st.info("Log in from the sidebar to see and keep your past reports.")
+        st.info("Log in from the Account box at the top to see and keep your past reports.")
     else:
         saved = list_reports()
         if not saved:
-            st.write("You have no saved reports yet. Use 'Save report to my history' in the sidebar.")
+            st.write("You have no saved reports yet. Use 'Save report to my history' at the bottom of the page.")
         for item in saved:
             when = item["created_at"][:16].replace("T", " ")
             col_a, col_b, col_c = st.columns([5, 2, 1])
@@ -286,30 +294,31 @@ if report_insights and report_insights.startswith(("The AI could not", "No API k
 
 report_html = build_report_html(summary, report_insights, st.session_state.get("problems"))
 
-with st.sidebar:
-    st.divider()
-    st.header("Report")
-    st.caption("Download a summary you can keep, print or share.")
+with st.container(border=True):
+    st.subheader("Your report")
+    st.caption("Download a summary you can keep, print or share. If you generated AI insights, they are included.")
 
     flash = st.session_state.pop("flash", None)
     if flash:
         st.success(flash)
 
-    st.download_button(
-        "Download report",
-        data=report_html,
-        file_name="sales_report.html",
-        mime="text/html",
-    )
-
-    if current_user_email():
-        if st.button("Save report to my history"):
-            title = f"Sales report {summary['first_date']} to {summary['last_date']}"
-            ok, message = save_report(title, report_html)
-            if ok:
-                st.session_state["flash"] = message
-                st.rerun()
-            else:
-                st.error(message)
-    else:
-        st.caption("Log in to save reports to your history.")
+    btn_a, btn_b = st.columns(2)
+    with btn_a:
+        st.download_button(
+            "Download report",
+            data=report_html,
+            file_name="sales_report.html",
+            mime="text/html",
+        )
+    with btn_b:
+        if current_user_email():
+            if st.button("Save report to my history"):
+                title = f"Sales report {summary['first_date']} to {summary['last_date']}"
+                ok, message = save_report(title, report_html)
+                if ok:
+                    st.session_state["flash"] = message
+                    st.rerun()
+                else:
+                    st.error(message)
+        else:
+            st.caption("Log in to save reports to your history.")
